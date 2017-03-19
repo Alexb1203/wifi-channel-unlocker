@@ -1,0 +1,101 @@
+#!/bin/bash
+
+crda_path="crda-3.18"
+reg_bin="regulatory.bin"
+system_crda_path="/usr/lib/crda"
+reg_bt_bin_32_path="$system_crda_path/$reg_bin"
+reg_bt_64_path="/usr/lib64/crda"
+reg_bt_bin_64_path="$reg_bt_64_path/$reg_bin"
+reg_ka_32_path="/lib/crda"
+reg_ka_bin_32_path="$reg_ka_32_path/$reg_bin"
+reg_ka_64_path="/lib64/crda"
+reg_ka_bin_64_path="$reg_ka_64_path/$reg_bin"
+
+function save_regulatory {
+     if [ -e "$1" ]; then
+          if [ ! -e "$1.old" ]; then
+               mv "$1" "$1.old"
+          fi
+          cp "./$reg_bin" "$1"
+     fi
+}
+
+function create_link {
+     if [ -e "$1" ]; then
+          ln -s $1 $2
+     fi
+}
+
+dpkg -s libgcrypt20-dev &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "libgcrypt20-dev is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+dpkg -s libnl-3-dev &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "libnl-3-dev is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+dpkg -s python-m2crypto &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "python-m2crypto is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+dpkg -s gcc &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "gcc is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+dpkg -s make &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "make is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+dpkg -s pkg-config &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "pkg-config is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+dpkg -s libnl-genl-3-dev &> /dev/null
+if [ "$?" -eq "1" ]; then
+     echo "libnl-genl-3-dev is not installed, quitting.  Pleast install that before continuing."
+     exit
+fi
+
+echo "Building wireless-regdb with the modified db.txt."
+cd "./wireless-regdb"
+make
+cp -v *.pem "../$crda_path/pubkeys/"
+echo
+
+if [ -e $reg_ka_32_path ] || [ -e $reg_ka_64_path ]; then
+     if [ ! -d $system_crda_path ]; then
+          echo "Creating symbolic link $system_crda_path"
+          create_link $reg_ka_32_path $system_crda_path
+          create_link $reg_ka_64_path $system_crda_path
+          echo
+     fi
+fi
+
+echo "Saving off a copy of the old regulatory.bin and droping the new one in the right locations."
+save_regulatory $reg_bt_bin_32_path
+save_regulatory $reg_bt_bin_64_path
+save_regulatory $reg_ka_bin_32_path
+save_regulatory $reg_ka_bin_64_path
+echo
+
+echo "Building CRDA with the new certificates from wireless-regdb."
+cd "../$crda_path/"
+make
+make install
+echo
+
+echo "Please follow the laws of your region and stay within the specifications of your hardware."
+echo "I am not responsible for any repercussions of using this software."
+echo "Please reboot the system for the changes to take effect."
